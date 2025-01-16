@@ -1,60 +1,65 @@
 import cv2
+import numpy as np  # Make sure to import numpy
+from PIL import Image, ImageDraw, ImageFont
 
-# Face classifier
+# Load Haar Cascade files for face and smile detection
 face_detector = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 smile_detector = cv2.CascadeClassifier('haarcascade_smile.xml')
 
-# Grab Webcam feed
+# Grab webcam feed
 webcam = cv2.VideoCapture(0)
 
-# Show the current frame
+if not webcam.isOpened():
+    print("Error: Could not access the webcam.")
+    exit()
+
+# Loop through each frame
 while True:
     # Read current frame from webcam
     successful_frame_read, frame = webcam.read()
-
     if not successful_frame_read:
-         break
-    
-    # Change to grayscale
+        print("Error: Could not read frame.")
+        break
+
+    # Convert frame to grayscale
     frame_grayscale = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Detect faces first
-    faces = face_detector.detectMultiScale(frame_grayscale)
+    # Detect faces
+    faces = face_detector.detectMultiScale(frame_grayscale, minNeighbors=5)
 
-    # Run face detection within each of those faces
+    # Process each detected face
     for (x, y, w, h) in faces:
         # Draw a rectangle around the face
         cv2.rectangle(frame, (x, y), (x + w, y + h), (100, 200, 50), 4)
-        
-        # Get the sub frame (using numpy N-dimensional array slicing)
-        the_face = frame[y: y + h, x : x + w]
-        
-        # Change to grayscale
+
+        # Extract the face region
+        the_face = frame[y: y + h, x: x + w]
+
+        # Convert face region to grayscale
         face_grayscale = cv2.cvtColor(the_face, cv2.COLOR_BGR2GRAY)
-        
-        # Detect smiles
-        smiles = smile_detector.detectMultiScale(face_grayscale, scaleFactor=1.7, minNeighbors=20)
-        
-        # Label this face as smilling
+
+        # Detect smiles in the face
+        smiles = smile_detector.detectMultiScale(face_grayscale, scaleFactor=1.7, minNeighbors=45)
+
+        # Label the face as "Smiling" if smiles are detected
         if len(smiles) > 0:
-            cv2.putText(
-                frame, 
-                'Smilling', 
-                (x, y + h + 40), 
-                fontScale=1.3, 
-                fontFace=cv2.FONT_HERSHEY_PLAIN, 
-                color=(255,255,255)
-            )
+            # Use custom font with PIL
+            pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            draw = ImageDraw.Draw(pil_image)
+            font_path = "Bubblegum.ttf"
+            font = ImageFont.truetype(font_path, 32)
+            draw.text((x, y + h + 10), "Smiling", font=font, fill=(255, 255, 255))
 
-    # Show current frame
-    cv2.imshow('Smile Detector', frame )
+            # Convert PIL image back to OpenCV format
+            frame = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
 
-    # Go to next frame in 1 ms
+    # Display the frame
+    cv2.imshow('Smile Detector (press q to quit)', frame)
+
+    # Break the loop if 'q' is pressed
     if cv2.waitKey(1) == ord('q'):
         break
 
-# Clean up: tell the OS that the app is done using the webcam
+# Release the webcam and close all OpenCV windows
 webcam.release()
-
-# Close all windows
 cv2.destroyAllWindows()
